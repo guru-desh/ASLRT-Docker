@@ -1,5 +1,5 @@
-FROM --platform=linux/amd64 ubuntu:20.04
-
+FROM --platform=linux/amd64 ubuntu:20.04                                                                                  
+                                                                                                                          
 LABEL maintainer="Gururaj Deshpande <gurudesh@gatech.edu>"
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -64,17 +64,23 @@ WORKDIR /htk
 # This prepare script is where htk is built from scratch
 RUN dos2unix prepare && chmod +x prepare && ./prepare
 
+WORKDIR /
 # Install Pytorch
 RUN conda install -y pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 
 # Install Tensorflow
 RUN conda install -y -c conda-forge cudatoolkit=11.8.0 && \
-    python3 -m pip install nvidia-cudnn-cu11==8.6.0.163 && \
+    python3 -m pip install --no-cache-dir nvidia-cudnn-cu11 && \
     mkdir -p $CONDA_PREFIX/etc/conda/activate.d && \
+    CUDNN_PATH=$(dirname $(python -c "import nvidia.cudnn;print(nvidia.cudnn.__file__)")) && \
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/:$CUDNN_PATH/lib && \
     echo 'CUDNN_PATH=$(dirname $(python -c "import nvidia.cudnn;print(nvidia.cudnn.__file__)"))' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh && \
     echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/:$CUDNN_PATH/lib' >> $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh && \
     python3 -m pip install --upgrade pip && \
     pip install tensorflow==2.12.*
+
+ENV CUDNN_PATH=/opt/conda/lib/python3.10/site-packages/nvidia/cudnn
+ENV LD_LIBRARY_PATH=:/opt/conda/lib/:/lib:/opt/conda/lib/:/opt/conda/lib/python3.10/site-packages/nvidia/cudnn/lib
 
 # Install other Python dependencies
 RUN conda install -y -c huggingface \
@@ -92,6 +98,5 @@ RUN conda install -y -c huggingface \
     plotly \
     pyarrow && \
     conda clean -ya && \
-    python3 -m pip install opencv-python-headless \
+    python3 -m pip install --no-cache-dir opencv-python-headless \
         p-tqdm
-
