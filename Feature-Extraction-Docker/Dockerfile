@@ -39,7 +39,6 @@ ENV PATH=$CONDA_DIR/bin:$PATH
 # Initialize conda
 RUN conda init bash && \
     echo "conda activate base" >> ~/.bashrc
-
 RUN bash -c "source ${HOME}/.bashrc" 
 
 # Set CUDA environment variables
@@ -59,13 +58,46 @@ RUN cd / && git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose &
     cmake ../ -G "Unix Makefiles" -DBUILD_PYTHON=ON && \
     make -j "$(($(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc)))>1 ? $(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc))) : 1))"
 
+ENV TORCH_CUDA_ARCH_LIST="3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6+PTX"
+
 # Install AlphaPose
 RUN cd ~ && \
-    conda install pytorch torchvision torchaudio pytorch-cuda=11.3 -c pytorch -c nvidia && \
+    conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch && \
     git clone https://github.com/MVIG-SJTU/AlphaPose.git && \
     cd AlphaPose && \
-    python -m pip install cython && \
-    python setup.py build develop
+    python -m pip install --no-cache-dir cython natsort halpecocotools pycocotools && \
+    python setup.py build develop --user
+
+# Install Tensorflow from source
+RUN apt-get update && apt install apt-transport-https curl gnupg && \
+    curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg && \
+    mv bazel-archive-keyring.gpg /usr/share/keyrings && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list && \
+    apt-get update && \
+    apt-get install -y bazel-5.0.0 && \
+    ln -s /usr/bin/bazel-5.0.0 /usr/bin/bazel && \
+    apt-get install -y openjdk-11-jdk && \
+    apt-get update && \
+    rm -rf /var/lib/apt/lists/*
+ENV TF_NEED_CUDA=1 \
+    TF_CUDA_VERSION=11.3 \
+    CUDA_TOOLKIT_PATH=/usr/local/cuda \
+    TF_CUDNN_VERSION=8 \
+    CUDNN_INSTALL_PATH=/usr \
+    TF_CUDA_COMPUTE_CAPABILITIES=3.5,5.0,6.0,6.1,7.0,7.5,8.0,8.6 \
+    CC_OPT_FLAGS="--config=cuda" \
+    PYTHON_BIN_PATH="/opt/conda/bin/python"
+
+RUN rm -rf /tensorflow && git clone https://github.com/tensorflow/tensorflow.git && \
+    cd tensorflow && \
+    git checkout r2.9 && \
+    ./configure && \
+    bazel clean --expunge && \
+    bazel build --config=cuda --local_ram_resources="$(free -m | grep '^Mem:' | grep -o '[^ ]*$')" //tensorflow/tools/pip_package:build_pip_package
+
+RUN cd /tensorflow && \ 
+    bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg && \
+    python3 -m pip install /tmp/tensorflow_pkg/tensorflow-2.9*.whl
 
 # Install Python dependencies
 RUN conda install -y -c conda-forge \
@@ -83,8 +115,9 @@ RUN conda install -y -c conda-forge \
         ipywidgets \
         jupyter \
         plotly \
+        tf-bodypix \
     && conda clean -ya && \
-    python -m pip install opencv-python-headless \
+    python -m pip install --no-cache-dir opencv-python-headless \
         p-tqdm \
         mediapipe==0.10.* \
         ffmpeg-python
