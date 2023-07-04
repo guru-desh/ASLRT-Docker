@@ -91,7 +91,7 @@ RUN cd ~ && \
 
 # Build OpenCV from source
 # Source: https://github.com/JulianAssmann/opencv-cuda-docker/blob/master/ubuntu-20.04/opencv-4.5/cuda-11.1/Dockerfile
-RUN bash /espnet/tools/activate_python.sh && cd /opt/ &&\
+RUN cd /opt/ &&\
     # Download and unzip OpenCV and opencv_contrib and delete zip files
     wget --quiet https://github.com/opencv/opencv/archive/$OPENCV_VERSION.zip &&\
     unzip -qq ${OPENCV_VERSION}.zip &&\
