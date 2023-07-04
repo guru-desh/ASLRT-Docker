@@ -79,7 +79,7 @@ RUN cd / && git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose &
     cmake ../ -G "Unix Makefiles" -DBUILD_PYTHON=ON && \
     make -j "$(($(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc)))>1 ? $(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc))) : 1))"
 
-ENV TORCH_CUDA_ARCH_LIST="3.0;3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6;8.9+PTX"
+ENV TORCH_CUDA_ARCH_LIST="3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6;8.9+PTX"
 
 # Install AlphaPose
 RUN cd ~ && \
@@ -107,7 +107,7 @@ RUN bash /espnet/tools/activate_python.sh && cd /opt/ &&\
         -DBUILD_opencv_python2=OFF \
         -DBUILD_opencv_python3=ON \
         -DWITH_CUDA=ON \
-        -DCUDA_ARCH_BIN=3.0,3.5,5.0,6.0,6.1,7.0,7.5,8.0,8.6,8.9  \
+        -DCUDA_ARCH_BIN=3.5,5.0,6.0,6.1,7.0,7.5,8.0,8.6,8.9  \
         -DCMAKE_BUILD_TYPE=RELEASE \
         -DCUDNN_VERSION=8 \
         -DPYTHON3_LIBRARY=/opt/conda/lib/python3.8 \
@@ -140,7 +140,7 @@ ENV TF_NEED_CUDA=1 \
     CUDA_TOOLKIT_PATH=/usr/local/cuda \
     TF_CUDNN_VERSION=8 \
     CUDNN_INSTALL_PATH=/usr \
-    TF_CUDA_COMPUTE_CAPABILITIES=3.0,3.5,5.0,6.0,6.1,7.0,7.5,8.0,8.6,8.9 \
+    TF_CUDA_COMPUTE_CAPABILITIES=3.5,5.0,6.0,6.1,7.0,7.5,8.0,8.6,8.9 \
     CC_OPT_FLAGS="--config=cuda" \
     PYTHON_BIN_PATH="/opt/conda/bin/python"
 
