@@ -27,6 +27,9 @@ RUN apt-get update && apt-get upgrade -y && \
         ffmpeg \
         libatlas-base-dev \
     # Install Dependencies for OpenCV
+        libpython2.7-dev \
+        python-numpy \
+        python-dev \
         build-essential \
         yasm \
         pkg-config \
@@ -101,6 +104,7 @@ RUN cd /opt/ &&\
     rm ${OPENCV_VERSION}.zip &&\
     # Create build folder and switch to it
     mkdir /opt/opencv-${OPENCV_VERSION}/build && cd /opt/opencv-${OPENCV_VERSION}/build &&\
+    apt update && apt install -y python3-dev && \
     # Cmake configure
     cmake \
         -DOPENCV_EXTRA_MODULES_PATH=/opt/opencv_contrib-${OPENCV_VERSION}/modules \
