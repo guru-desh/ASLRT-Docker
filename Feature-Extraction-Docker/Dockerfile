@@ -20,7 +20,6 @@ RUN apt-get update && apt-get upgrade -y && \
         libgflags-dev \
         libyaml-dev \
         unzip \ 
-        libopencv-dev \
         software-properties-common \
         libboost-all-dev \
         libhdf5-dev \
@@ -30,6 +29,7 @@ RUN apt-get update && apt-get upgrade -y && \
         libpython2.7-dev \
         python-numpy \
         python-dev \
+        python3.8-dev \
         build-essential \
         yasm \
         pkg-config \
@@ -50,6 +50,13 @@ RUN apt-get update && apt-get upgrade -y && \
         libswscale-dev \
         libeigen3-dev \
         libgtk2.0-dev \
+        libxml2-dev \
+        libxslt1-dev \
+        libldap2-dev \
+        libsasl2-dev \
+        libffi-dev \
+        libjpeg-dev \
+        libxml2-dev \
     && rm -rf /var/lib/apt/lists/* && \
     ldconfig /usr/local/cuda/lib64
 
@@ -73,6 +80,45 @@ ENV CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
     HDF5_ROOT=/usr/lib/x86_64-linux-gnu/hdf5/serial/ \
     ATLAS_ROOT=/usr/lib/atlas-base/
 
+# Build OpenCV from source
+# Source: https://github.com/JulianAssmann/opencv-cuda-docker/blob/master/ubuntu-20.04/opencv-4.5/cuda-11.1/Dockerfile
+ENV PYTHON_INCLUDE_DIR=/opt/conda/include/python3.10/Python.h
+RUN cd /opt/ &&\
+    # Download and unzip OpenCV and opencv_contrib and delete zip files
+    wget --quiet https://github.com/opencv/opencv/archive/$OPENCV_VERSION.zip &&\
+    unzip -qq ${OPENCV_VERSION}.zip &&\
+    rm ${OPENCV_VERSION}.zip &&\
+    wget --quiet https://github.com/opencv/opencv_contrib/archive/$OPENCV_VERSION.zip &&\
+    unzip -qq ${OPENCV_VERSION}.zip &&\
+    rm ${OPENCV_VERSION}.zip &&\
+    # Create build folder and switch to it
+    mkdir /opt/opencv-${OPENCV_VERSION}/build && cd /opt/opencv-${OPENCV_VERSION}/build &&\
+    # Cmake configure
+    cmake \
+        -DOPENCV_EXTRA_MODULES_PATH=/opt/opencv_contrib-${OPENCV_VERSION}/modules \
+        -DBUILD_opencv_python2=OFF \
+        -DBUILD_opencv_python3=ON \
+        -DWITH_CUDA=ON \
+        -DCUDA_ARCH_BIN=3.5,5.0,6.0,6.1,7.0,7.5,8.0,8.6  \
+        -DCMAKE_BUILD_TYPE=RELEASE \
+        -DCUDNN_VERSION=8 \
+        -DPYTHON_DEFAULT_EXECUTABLE=$(which python3) \
+        -DPYTHON3_EXECUTABLE=$(which python3)  \
+        -DPYTHON_INCLUDE_DIR=$(python3 -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())")  \
+        -DPYTHON3_INCLUDE_DIR=$(python3 -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
+        -DPYTHON3_LIBRARY=$(python3 -c "from distutils.sysconfig import get_config_var;from os.path import dirname,join ; print(join(dirname(get_config_var('LIBPC')),get_config_var('LDLIBRARY')))")  \
+        -DPYTHON3_NUMPY_INCLUDE_DIRS=$(python3 -c "import numpy; print(numpy.get_include())")  \
+        -DPYTHON3_PACKAGES_PATH=$(python3 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")  \
+        -DOPENCV_GENERATE_PKGCONFIG=ON .. \
+        .. &&\
+    # Make
+    make -j "$(($(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc)))>1 ? $(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc))) : 1))" && \
+    # Install to /usr/local/lib
+    make install && \
+    ldconfig && \
+    # Remove OpenCV sources and build folder
+    rm -rf /opt/opencv-${OPENCV_VERSION} && rm -rf /opt/opencv_contrib-${OPENCV_VERSION}
+
 # Build OpenPose from source
 RUN cd / && git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose && \
     cd openpose/ && \
@@ -91,42 +137,6 @@ RUN cd ~ && \
     cd AlphaPose && \
     python -m pip install --no-cache-dir cython natsort halpecocotools pycocotools && \
     python setup.py build develop --user
-
-# Build OpenCV from source
-# Source: https://github.com/JulianAssmann/opencv-cuda-docker/blob/master/ubuntu-20.04/opencv-4.5/cuda-11.1/Dockerfile
-RUN cd /opt/ &&\
-    # Download and unzip OpenCV and opencv_contrib and delete zip files
-    wget --quiet https://github.com/opencv/opencv/archive/$OPENCV_VERSION.zip &&\
-    unzip -qq ${OPENCV_VERSION}.zip &&\
-    rm ${OPENCV_VERSION}.zip &&\
-    wget --quiet https://github.com/opencv/opencv_contrib/archive/$OPENCV_VERSION.zip &&\
-    unzip -qq ${OPENCV_VERSION}.zip &&\
-    rm ${OPENCV_VERSION}.zip &&\
-    # Create build folder and switch to it
-    mkdir /opt/opencv-${OPENCV_VERSION}/build && cd /opt/opencv-${OPENCV_VERSION}/build &&\
-    apt update && apt install -y python3-dev && \
-    # Cmake configure
-    cmake \
-        -DOPENCV_EXTRA_MODULES_PATH=/opt/opencv_contrib-${OPENCV_VERSION}/modules \
-        -DBUILD_opencv_python2=OFF \
-        -DBUILD_opencv_python3=ON \
-        -DWITH_CUDA=ON \
-        -DCUDA_ARCH_BIN=3.5,5.0,6.0,6.1,7.0,7.5,8.0,8.6  \
-        -DCMAKE_BUILD_TYPE=RELEASE \
-        -DCUDNN_VERSION=8 \
-        -DPYTHON3_LIBRARY=/opt/conda/lib/python3.8 \
-        -DPYTHON3_INCLUDE_DIR=/opt/conda/include/python3.8 \
-        -DPYTHON3_EXECUTABLE=/opt/conda/bin/python \
-        -DPYTHON3_PACKAGES_PATH=/opt/conda/lib/python3.8/site-packages \
-        .. &&\
-    # Make
-    make -j "$(($(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc)))>1 ? $(($((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) < $(nproc) ? $((`free -g | grep '^Mem:' | grep -o '[^ ]*$'`/2)) : $(nproc))) : 1))" && \
-    # Install to /usr/local/lib
-    make install && \
-    ldconfig && \
-    # Remove OpenCV sources and build folder
-    rm -rf /opt/opencv-${OPENCV_VERSION} && rm -rf /opt/opencv_contrib-${OPENCV_VERSION}
-
 
 # Install Tensorflow from source
 RUN apt-get update && apt install -y apt-transport-https curl gnupg && \
@@ -175,9 +185,9 @@ RUN conda install -y -c conda-forge \
         ipywidgets \
         jupyter \
         plotly \
-        tf-bodypix \
     && conda clean -ya && \
     python -m pip install --no-cache-dir \
         p-tqdm \
         mediapipe==0.10.* \
-        ffmpeg-python
+        ffmpeg-python \
+	tf-bodypix
